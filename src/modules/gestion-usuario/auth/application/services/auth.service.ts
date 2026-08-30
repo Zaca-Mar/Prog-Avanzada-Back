@@ -94,15 +94,12 @@ export class AuthService {
     };
   }
 
-  async loginConGoogle(token: string, empresaId: number): Promise<any> {
+    async loginConGoogle(token: string, empresaId: number): Promise<any> {
     const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    console.log('🔵 GOOGLE_CLIENT_ID:', clientId);
     const client = new OAuth2Client(clientId);
-    console.log('🔵 CLIENTE:', client);
 
     let email;
     let name;
-    // Verificamos el token con Google
     try {
       const ticket = await client.verifyIdToken({
         idToken: token,
@@ -112,40 +109,28 @@ export class AuthService {
       const payload = ticket.getPayload();
       email = payload?.email;
       name = payload?.name;
-      console.log('🟢 Payload de Google:', payload);
-
-      // ... resto del código
     } catch (error) {
       console.error('🔴 Error al verificar el token de Google:', error);
       throw new UnauthorizedException('Token de Google inválido o expirado');
     }
 
-    // Buscar usuario por email
     let usuario = await this.usuarioService.findByMail(email);
-    console.log('🟢 Usuario encontrado:', usuario);
 
-    // Si no existe, lo creamos automáticamente
     if (!usuario) {
-      console.log('🟠 Usuario no existe, se va a crear uno nuevo');
-
       const registrarUsuarioDto: RegistrarUsuarioDto = {
         mail: email,
-        contrasena: Math.random().toString(36).slice(-10), // contraseña aleatoria
-        rolId: 2, // Asignar un rol por defecto, por ejemplo "Empleado"
+        contrasena: Math.random().toString(36).slice(-10),
+        rolId: 1,
         denominacion: name,
       };
-      console.log('🟠 Registrar Usuario DTO:', registrarUsuarioDto);
 
-      usuario = await this.registrarUsuario(registrarUsuarioDto);
+      await this.registrarUsuario(registrarUsuarioDto);
+      usuario = await this.usuarioService.findByMail(email);
     }
 
-    const payloadJwt = {
-      id: usuario?.id,
-      rolId: 1, //usuario?.rol.id,
-      empresaId: empresaId, // poné la lógica que te sirva
-      puntoVentaId: process.env.PUNTO_VENTA_ACTIVO_ID,
-    };
-
+    if (!usuario) {
+      throw new UnauthorizedException('No se pudo obtener el usuario');
+    }
 
     const accessTokenExp = this.configService.get<string>(
       'JWT_EXPIRATION_ACCESS',
@@ -155,6 +140,14 @@ export class AuthService {
       'JWT_EXPIRATION_REFRESH',
       '7d',
     );
+
+    const payloadJwt = {
+      sub: usuario.id,
+      personalId: usuario.personalId,
+      roles: usuario.roles.map((r) => r.id),
+      empresaId: empresaId,
+      puntoVentaId: process.env.PUNTO_VENTA_ACTIVO_ID,
+    };
 
     const accessToken = this.jwtService.sign(payloadJwt, {
       expiresIn: accessTokenExp,
@@ -169,7 +162,6 @@ export class AuthService {
       usuario,
     };
   }
-
   async enviarCodigoRecuperacion(dto: RecuperarPasswordDto) {
     const { mail } = dto;
 
