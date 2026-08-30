@@ -120,7 +120,7 @@ export class AuthService {
       const registrarUsuarioDto: RegistrarUsuarioDto = {
         mail: email,
         contrasena: Math.random().toString(36).slice(-10),
-        rolId: 1,
+        rolId: 2,
         denominacion: name,
       };
 
